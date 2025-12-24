@@ -1,18 +1,30 @@
-name: Build MyBrain APK
+name: Build MyBrain Update APK
 
+# Manual trigger or push to main (feel free to add tag triggers)
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
 
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
 
+    # Pass the secret values into the job environment
+    env:
+      MYBRAIN_KEYSTORE_PASS: ${{ secrets.MYBRAIN_KEYSTORE_PASS }}
+      MYBRAIN_KEY_PASS: ${{ secrets.MYBRAIN_KEY_PASS }}
+
     steps:
+      # ---------------------------------------------------------
+      # 0️⃣ Checkout the repo
+      # ---------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ---------------------------------------------------------
+      # 1️⃣ Set up JDK 17 (required by Android Gradle Plugin)
+      # ---------------------------------------------------------
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -20,7 +32,7 @@ jobs:
           java-version: 17
 
       # ---------------------------------------------------------
-      # 1️⃣ Install Android SDK command‑line tools (fixed)
+      # 2️⃣ Install Android SDK command‑line tools
       # ---------------------------------------------------------
       - name: Install Android SDK
         run: |
@@ -32,50 +44,57 @@ jobs:
           mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
           rm "$TMP_ZIP"
 
-          # Export SDK vars for later steps
           export ANDROID_SDK_ROOT=$HOME/android-sdk
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
 
-          # Accept licences (required for sdkmanager)
+          # Accept licences silently
           yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses >/dev/null
 
-          # Install the platform / build‑tools we need
+          # Install the platform & build‑tools we need
           sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
             "platforms;android-34" \
             "build-tools;34.0.0" \
             "platform-tools"
 
+          # Persist env vars for later steps
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH" >> $GITHUB_ENV
+
       # ---------------------------------------------------------
-      # 2️⃣ Make Gradle wrapper executable
+      # 3️⃣ Make Gradle wrapper executable
       # ---------------------------------------------------------
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
       # ---------------------------------------------------------
-      # 3️⃣ Align SDK environment variables (the crucial fix)
+      # 4️⃣ Decode the keystore secret (creates mybrain.keystore)
+      # ---------------------------------------------------------
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.MYBRAIN_KEYSTORE }}" | base64 -d > mybrain.keystore
+          ls -l mybrain.keystore   # sanity check
+
+      # ---------------------------------------------------------
+      # 5️⃣ Align SDK env vars (ANDROID_HOME is deprecated but some plugins still read it)
       # ---------------------------------------------------------
       - name: Align Android SDK environment variables
         run: |
-          # Both variables must point to the SAME directory
           export ANDROID_SDK_ROOT=$HOME/android-sdk
-          export ANDROID_HOME=$ANDROID_SDK_ROOT   # <-- make them identical
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          export ANDROID_HOME=$ANDROID_SDK_ROOT   # make them identical
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH" >> $GITHUB_ENV
 
       # ---------------------------------------------------------
-      # 4️⃣ Build the debug APK
+      # 6️⃣ Build the **release** APK (signed with the keystore)
       # ---------------------------------------------------------
-      - name: Build debug APK
+      - name: Build release APK
         run: |
-          # The env vars were exported in the previous step via $GITHUB_ENV
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       # ---------------------------------------------------------
-      # 5️⃣ Upload the APK as an artifact
+      # 7️⃣ Upload the signed APK as an artifact
       # ---------------------------------------------------------
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MyBrain-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: MyBrain-update-apk
+          path: app/build/outputs/apk/release/app-release.apk
