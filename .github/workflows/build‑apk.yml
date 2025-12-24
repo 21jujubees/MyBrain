@@ -1,6 +1,5 @@
 name: Build MyBrain Unsigned Release APK
 
-# Trigger manually or on every push to main
 on:
   workflow_dispatch:
   push:
@@ -11,24 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ------------------------------
-      # 0️⃣ Checkout the repository
-      # ------------------------------
+      # -------------------------------------------------
+      # 0️⃣ Checkout repository
+      # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ------------------------------
+      # -------------------------------------------------
       # 1️⃣ Set up JDK 17 (required by AGP)
-      # ------------------------------
+      # -------------------------------------------------
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # ------------------------------
+      # -------------------------------------------------
       # 2️⃣ Install Android SDK command‑line tools
-      # ------------------------------
+      # -------------------------------------------------
       - name: Install Android SDK
         run: |
           mkdir -p $HOME/android-sdk/cmdline-tools
@@ -55,30 +54,41 @@ jobs:
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           echo "PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH" >> $GITHUB_ENV
 
-      # ------------------------------
+      # -------------------------------------------------
       # 3️⃣ Make Gradle wrapper executable
-      # ------------------------------
+      # -------------------------------------------------
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      # ------------------------------
-      # 4️⃣ Build **release** (unsigned) APK
-      # ------------------------------
+      # -------------------------------------------------
+      # 4️⃣ Align SDK environment variables (critical fix)
+      # -------------------------------------------------
+      - name: Align Android SDK environment variables
+        run: |
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          export ANDROID_HOME=$ANDROID_SDK_ROOT   # make them identical
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH" >> $GITHUB_ENV
+
+      # -------------------------------------------------
+      # 5️⃣ Build unsigned release APK
+      # -------------------------------------------------
       - name: Build unsigned release APK
         run: |
           ./gradlew assembleRelease --no-daemon --stacktrace --info
 
-      # ------------------------------
-      # 5️⃣ List what was generated (debug aid)
-      # ------------------------------
+      # -------------------------------------------------
+      # 6️⃣ List what was generated (debug aid)
+      # -------------------------------------------------
       - name: List release APK directory
         run: |
           echo "=== RELEASE APK DIRECTORY ==="
           ls -l app/build/outputs/apk/release
 
-      # ------------------------------
-      # 6️⃣ Upload the APK artifact
-      # ------------------------------
+      # -------------------------------------------------
+      # 7️⃣ Upload the APK artifact
+      # -------------------------------------------------
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
