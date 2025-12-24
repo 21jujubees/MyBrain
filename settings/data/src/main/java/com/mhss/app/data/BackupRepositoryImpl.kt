@@ -51,7 +51,7 @@ class BackupRepositoryImpl(
                 val notes = if (exportNotes) database.noteDao().getAllNotes() else emptyList()
                 val noteFolders = if (exportNotes) database.noteDao().getAllNoteFolders().first() else emptyList()
                 val tasks = if (exportTasks) database.taskDao().getAllTasks().first() else emptyList()
-                val diary = if (exportDiary) database.diaryDao().getAllEntries().first() else emptyList()
+                val diary = if (exportDiary) database.diaryDao().getAllEntriesFull().first() else emptyList()
                 val bookmarks = if (exportBookmarks) database.bookmarkDao().getAllBookmarks().first() else emptyList()
 
                 val backupData = BackupData(notes, noteFolders, tasks, diary, bookmarks)
