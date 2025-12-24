@@ -10,6 +10,9 @@ interface DiaryDao {
     @Query("SELECT title, SUBSTR(content, 1, 200) AS content, created_date, updated_date, mood, id FROM diary")
     fun getAllEntries(): Flow<List<DiaryEntryEntity>>
 
+    @Query("SELECT title, content, created_date, updated_date, mood, id FROM diary")
+    suspend fun getAllEntriesFull(): List<DiaryEntryEntity>
+
     @Query("SELECT * FROM diary WHERE id = :id")
     suspend fun getEntry(id: Int): DiaryEntryEntity
 
