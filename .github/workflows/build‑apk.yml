@@ -1,25 +1,18 @@
 name: Build MyBrain APK
 
-# Run manually or on every push to main (adjust branch name if you use another)
 on:
-  workflow_dispatch:      # allows you to start it from the UI
+  workflow_dispatch:
   push:
-    branches: [ main ]   # change if you work on a different branch
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # ---------------------------------------------------------
-      # 1️⃣ Checkout the code
-      # ---------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------------------------------------------------------
-      # 2️⃣ Set up JDK 17 (required by the Android Gradle plugin)
-      # ---------------------------------------------------------
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -27,46 +20,55 @@ jobs:
           java-version: 17
 
       # ---------------------------------------------------------
-      # 3️⃣ Install Android SDK command‑line tools (fixed)
+      # 1️⃣ Install Android SDK command‑line tools (fixed)
       # ---------------------------------------------------------
       - name: Install Android SDK
         run: |
-          # 1️⃣ Create SDK root
           mkdir -p $HOME/android-sdk/cmdline-tools
-      
-          # 2️⃣ Download the command‑line tools zip to a temp file
           TMP_ZIP=$(mktemp /tmp/cmdline-tools-XXXXXX.zip)
           wget -q -O "$TMP_ZIP" \
             https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-      
-          # 3️⃣ Unzip into the SDK folder and rename to “latest”
           unzip -q "$TMP_ZIP" -d $HOME/android-sdk/cmdline-tools
           mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
           rm "$TMP_ZIP"
-      
-          # 4️⃣ Export SDK vars for the rest of the job
+
+          # Export SDK vars for later steps
           export ANDROID_SDK_ROOT=$HOME/android-sdk
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
-      
-          # 5️⃣ Accept all licences (needed for sdkmanager)
+
+          # Accept licences (required for sdkmanager)
           yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses >/dev/null
-      
-          # 6️⃣ Install the platform and build‑tools we need
+
+          # Install the platform / build‑tools we need
           sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
             "platforms;android-34" \
             "build-tools;34.0.0" \
             "platform-tools"
 
+      # ---------------------------------------------------------
+      # 2️⃣ Make Gradle wrapper executable
+      # ---------------------------------------------------------
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
+
+      # ---------------------------------------------------------
+      # 3️⃣ Align SDK environment variables (the crucial fix)
+      # ---------------------------------------------------------
+      - name: Align Android SDK environment variables
+        run: |
+          # Both variables must point to the SAME directory
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          export ANDROID_HOME=$ANDROID_SDK_ROOT   # <-- make them identical
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH" >> $GITHUB_ENV
 
       # ---------------------------------------------------------
       # 4️⃣ Build the debug APK
       # ---------------------------------------------------------
       - name: Build debug APK
         run: |
-          export ANDROID_SDK_ROOT=$HOME/android-sdk
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+          # The env vars were exported in the previous step via $GITHUB_ENV
           ./gradlew assembleDebug --no-daemon
 
       # ---------------------------------------------------------
