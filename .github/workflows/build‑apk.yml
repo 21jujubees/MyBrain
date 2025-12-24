@@ -27,19 +27,32 @@ jobs:
           java-version: 17
 
       # ---------------------------------------------------------
-      # 3️⃣ Install Android SDK command‑line tools
+      # 3️⃣ Install Android SDK command‑line tools (fixed)
       # ---------------------------------------------------------
       - name: Install Android SDK
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y wget unzip
+          # 1️⃣ Create SDK root
           mkdir -p $HOME/android-sdk/cmdline-tools
-          wget -qO- https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip |
-            unzip -d $HOME/android-sdk/cmdline-tools
+      
+          # 2️⃣ Download the command‑line tools zip to a temp file
+          TMP_ZIP=$(mktemp /tmp/cmdline-tools-XXXXXX.zip)
+          wget -q -O "$TMP_ZIP" \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+      
+          # 3️⃣ Unzip into the SDK folder and rename to “latest”
+          unzip -q "$TMP_ZIP" -d $HOME/android-sdk/cmdline-tools
           mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          rm "$TMP_ZIP"
+      
+          # 4️⃣ Export SDK vars for the rest of the job
           export ANDROID_SDK_ROOT=$HOME/android-sdk
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
+      
+          # 5️⃣ Accept all licences (needed for sdkmanager)
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses >/dev/null
+      
+          # 6️⃣ Install the platform and build‑tools we need
+          sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
             "platforms;android-34" \
             "build-tools;34.0.0" \
             "platform-tools"
